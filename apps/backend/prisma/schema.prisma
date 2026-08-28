@@ -1,0 +1,289 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String       @id @default(uuid())
+  email        String       @unique
+  passwordHash String
+  fullName     String
+  status       String       @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  userRoles    UserRole[]
+  caseMembers  CaseMember[]
+  auditEvents  AuditEvent[]  @relation("ActorAudit")
+  notifications Notification[]
+  uploadedVersions DocumentVersion[] @relation("UploadedVersions")
+  grantedShares PermissionGrant[] @relation("GrantedShares")
+  receivedShares PermissionGrant[] @relation("ReceivedShares")
+  timelineEvents TimelineEvent[] @relation("CreatedTimelineEvents")
+  createdCases Case[] @relation("CreatedCases")
+
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id           String   @id @default(uuid())
+  action       String   // e.g. "case:create", "document:upload", "audit:read"
+  resourceType String   // e.g. "case", "document", "audit"
+  description  String?
+  createdAt    DateTime @default(now())
+
+  rolePermissions RolePermission[]
+
+  @@unique([action, resourceType])
+  @@map("permissions")
+}
+
+model UserRole {
+  id     String @id @default(uuid())
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  id           String @id @default(uuid())
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model Case {
+  id          String   @id @default(uuid())
+  caseNumber  String   @unique
+  title       String
+  description String?
+  status      String   @default("OPEN") // OPEN, UNDER_INVESTIGATION, IN_COURT, CLOSED, ARCHIVED
+  priority    String   @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  creator        User?           @relation("CreatedCases", fields: [createdBy], references: [id], onDelete: SetNull)
+  members        CaseMember[]
+  documents      Document[]
+  evidence       Evidence[]
+  timelineEvents TimelineEvent[]
+
+  @@map("cases")
+}
+
+model CaseMember {
+  id         String   @id @default(uuid())
+  caseId     String
+  userId     String
+  roleInCase String   @default("MEMBER") // LEAD_INVESTIGATOR, INVESTIGATOR, SUPERVISOR, PROSECUTOR, VIEWER
+  addedAt    DateTime @default(now())
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, userId])
+  @@map("case_members")
+}
+
+model Document {
+  id               String   @id @default(uuid())
+  caseId           String
+  title            String
+  documentType     String   // FIR, WITNESS_STATEMENT, POLICE_REPORT, CHARGE_SHEET, COURT_FILING, EVIDENCE_RECORD, FORENSIC_REPORT, LEGAL_NOTICE, JUDGMENT
+  currentVersionId String?
+  status           String   @default("DRAFT") // DRAFT, PROCESSING, UNDER_REVIEW, APPROVED, ARCHIVED, SUPERSEDED, REVOKED
+  tags             String[] @default([])
+  createdBy        String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  case           Case              @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  versions       DocumentVersion[]
+  timelineEvents TimelineEvent[]
+
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id               String   @id @default(uuid())
+  documentId       String
+  versionNumber    Int
+  storageKey       String   @unique
+  originalFilename String
+  sha256           String
+  mimeType         String
+  sizeBytes        BigInt
+  uploadedBy       String
+  uploadedAt       DateTime @default(now())
+  ocrStatus        String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED, NOT_APPLICABLE
+  ocrError         String?
+
+  document       Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  uploader       User              @relation("UploadedVersions", fields: [uploadedBy], references: [id], onDelete: Cascade)
+  ocrResult      OCRResult?
+  aiResults      AIResult[]
+  shares         PermissionGrant[]
+
+  @@unique([documentId, versionNumber])
+  @@map("document_versions")
+}
+
+model OCRResult {
+  id                String   @id @default(uuid())
+  documentVersionId String   @unique
+  extractedText     String   @db.Text
+  confidence        Float    @default(0.0)
+  status            String   @default("COMPLETED")
+  processedAt       DateTime @default(now())
+
+  version DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+
+  @@map("ocr_results")
+}
+
+model AIResult {
+  id                String   @id @default(uuid())
+  documentVersionId String
+  resultType        String   // SUMMARIZATION, CLASSIFICATION, ENTITY_EXTRACTION
+  output            String   @db.Text
+  modelName         String   @default("synthetic-legal-ai-v1")
+  advisoryOnly      Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  version DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+
+  @@map("ai_results")
+}
+
+model PermissionGrant {
+  id                String    @id @default(uuid())
+  documentVersionId String
+  grantedBy         String
+  grantedToUser     String?
+  externalToken     String?   @unique
+  scope             String    @default("VIEW_ONLY") // VIEW_ONLY, DOWNLOAD_ALLOWED
+  expiresAt         DateTime?
+  revoked           Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+
+  version   DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  granter   User            @relation("GrantedShares", fields: [grantedBy], references: [id], onDelete: Cascade)
+  recipient User?           @relation("ReceivedShares", fields: [grantedToUser], references: [id], onDelete: SetNull)
+
+  @@map("permission_grants")
+}
+
+model Evidence {
+  id             String          @id @default(uuid())
+  caseId         String
+  evidenceNumber String          @unique
+  evidenceType   String          // PHYSICAL, DIGITAL, FORENSIC, DOCUMENTARY
+  description    String
+  location       String?
+  collectedAt    DateTime        @default(now())
+  collectedBy    String?
+  createdAt      DateTime        @default(now())
+
+  case           Case            @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  timelineEvents TimelineEvent[]
+
+  @@map("evidence")
+}
+
+model TimelineEvent {
+  id          String   @id @default(uuid())
+  caseId      String
+  title       String
+  description String
+  eventTime   DateTime
+  createdBy   String
+  documentId  String?
+  evidenceId  String?
+  createdAt   DateTime @default(now())
+
+  case     Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  creator  User      @relation("CreatedTimelineEvents", fields: [createdBy], references: [id], onDelete: Cascade)
+  document Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  evidence Evidence? @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+
+  @@map("timeline_events")
+}
+
+model AuditEvent {
+  id           String   @id @default(uuid())
+  actorId      String?
+  action       String   // e.g. "user.login", "document.upload", "document.verify", "share.create"
+  resourceType String   // e.g. "user", "case", "document", "share"
+  resourceId   String?
+  outcome      String   @default("SUCCESS") // SUCCESS, FAILURE, DENIED
+  metadata     String?  @db.Text // JSON string
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  actor User? @relation("ActorAudit", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([action])
+  @@index([resourceType])
+  @@index([createdAt])
+  @@map("audit_events")
+}
+
+model Notification {
+  id            String   @id @default(uuid())
+  userId        String
+  title         String
+  message       String
+  type          String   // DOCUMENT_SHARED, OCR_COMPLETE, AI_RESULT_READY, CASE_ADDED
+  referenceType String?  // document, case, share
+  referenceId   String?
+  read          Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model JobQueue {
+  id         String   @id @default(uuid())
+  jobType    String   // OCR_PROCESS, AI_PROCESS, INDEX_SEARCH
+  payload    String   @db.Text // JSON payload
+  status     String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  attempts   Int      @default(0)
+  lastError  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([status])
+  @@index([jobType])
+  @@map("job_queue")
+}

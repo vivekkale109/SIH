@@ -1,0 +1,30 @@
+{
+  "name": "sih-sdms",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Secure Digital Document Management System for Legal & Investigation Records (SIH PS 26190)",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=apps/backend",
+    "dev:frontend": "npm run dev --workspace=apps/frontend",
+    "dev:worker": "npm run dev --workspace=apps/worker",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "keywords": [
+    "sdms",
+    "sih",
+    "legal-document-management",
+    "integrity",
+    "sha256",
+    "ocr",
+    "audit-trail"
+  ],
+  "author": "",
+  "license": "ISC"
+}
