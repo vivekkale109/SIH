@@ -1,7 +1,7 @@
 FROM node:20-alpine
 
-# Install tesseract-ocr packages if native fallback is used
-RUN apk add --no-co-cache tesseract-ocr tesseract-ocr-data-eng
+# Install tesseract-ocr packages
+RUN apk add --no-cache tesseract-ocr tesseract-ocr-data-eng
 
 WORKDIR /app
 

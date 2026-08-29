@@ -140,122 +140,129 @@ Investigating Officer: Inspector Ramesh Sharma
 Status: Registered and under active investigation.`;
 
   const sha256 = crypto.createHash('sha256').update(Buffer.from(sampleText)).digest('hex');
+  const storageKey = `documents/${case1.id}/seed-fir-0891.pdf`;
 
-  const doc1 = await prisma.document.create({
-    data: {
-      caseId: case1.id,
-      title: 'First Information Report (FIR 0891/2026)',
-      documentType: 'FIR',
-      status: 'APPROVED',
-      tags: ['FIR', 'Initial Registration', 'Cyber Cell'],
-      createdBy: invUser.id,
-    },
+  const existingVer = await prisma.documentVersion.findUnique({
+    where: { storageKey },
   });
 
-  const ver1 = await prisma.documentVersion.create({
-    data: {
-      documentId: doc1.id,
-      versionNumber: 1,
-      storageKey: `documents/${case1.id}/seed-fir-0891.pdf`,
-      originalFilename: 'FIR_0891_2026_Certified.pdf',
-      sha256,
-      mimeType: 'application/pdf',
-      sizeBytes: BigInt(Buffer.byteLength(sampleText)),
-      uploadedBy: invUser.id,
-      ocrStatus: 'COMPLETED',
-    },
-  });
+  if (!existingVer) {
+    const doc1 = await prisma.document.create({
+      data: {
+        caseId: case1.id,
+        title: 'First Information Report (FIR 0891/2026)',
+        documentType: 'FIR',
+        status: 'APPROVED',
+        tags: ['FIR', 'Initial Registration', 'Cyber Cell'],
+        createdBy: invUser.id,
+      },
+    });
 
-  await prisma.document.update({
-    where: { id: doc1.id },
-    data: { currentVersionId: ver1.id },
-  });
+    const ver1 = await prisma.documentVersion.create({
+      data: {
+        documentId: doc1.id,
+        versionNumber: 1,
+        storageKey,
+        originalFilename: 'FIR_0891_2026_Certified.pdf',
+        sha256,
+        mimeType: 'application/pdf',
+        sizeBytes: BigInt(Buffer.byteLength(sampleText)),
+        uploadedBy: invUser.id,
+        ocrStatus: 'COMPLETED',
+      },
+    });
 
-  // Seed OCR Result
-  await prisma.oCRResult.create({
-    data: {
-      documentVersionId: ver1.id,
-      extractedText: sampleText,
-      confidence: 0.96,
-      status: 'COMPLETED',
-    },
-  });
+    await prisma.document.update({
+      where: { id: doc1.id },
+      data: { currentVersionId: ver1.id },
+    });
 
-  // Seed AI Advisory Result
-  await prisma.aIResult.create({
-    data: {
-      documentVersionId: ver1.id,
-      resultType: 'SUMMARIZATION_AND_ENTITIES',
-      output: JSON.stringify({
-        summary: 'Synthetic initial FIR detailing cyber fraud complaint registered on 14-Aug-2026.',
-        suggestedClassification: 'FIR',
-        entities: {
-          people: ['Inspector Ramesh Sharma'],
-          dates: ['14-Aug-2026'],
-          locations: ['Cyber Crime Cell', 'Special Branch'],
-        },
-      }),
-      modelName: 'sdms-legal-advisory-ai-v1',
-      advisoryOnly: true,
-    },
-  });
+    // Seed OCR Result
+    await prisma.oCRResult.create({
+      data: {
+        documentVersionId: ver1.id,
+        extractedText: sampleText,
+        confidence: 0.96,
+        status: 'COMPLETED',
+      },
+    });
 
-  // 6. Synthetic Timeline Events & Evidence
-  const ev1 = await prisma.evidence.create({
-    data: {
-      caseId: case1.id,
-      evidenceNumber: 'EVD-2026-0891-01',
-      evidenceType: 'DIGITAL',
-      description: 'Cloned hard drive (1TB SSD) containing server log dumps and routing tables.',
-      location: 'Forensic Vault B-04',
-      collectedBy: 'Inspector Ramesh Sharma',
-    },
-  });
+    // Seed AI Advisory Result
+    await prisma.aIResult.create({
+      data: {
+        documentVersionId: ver1.id,
+        resultType: 'SUMMARIZATION_AND_ENTITIES',
+        output: JSON.stringify({
+          summary: 'Synthetic initial FIR detailing cyber fraud complaint registered on 14-Aug-2026.',
+          suggestedClassification: 'FIR',
+          entities: {
+            people: ['Inspector Ramesh Sharma'],
+            dates: ['14-Aug-2026'],
+            locations: ['Cyber Crime Cell', 'Special Branch'],
+          },
+        }),
+        modelName: 'sdms-legal-advisory-ai-v1',
+        advisoryOnly: true,
+      },
+    });
 
-  await prisma.timelineEvent.create({
-    data: {
-      caseId: case1.id,
-      title: 'Initial Registration & FIR Filing',
-      description: 'FIR 0891/2026 formally registered and assigned to Inspector Ramesh Sharma.',
-      eventTime: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-      createdBy: invUser.id,
-      documentId: doc1.id,
-    },
-  });
+    // 6. Synthetic Timeline Events & Evidence
+    const ev1 = await prisma.evidence.create({
+      data: {
+        caseId: case1.id,
+        evidenceNumber: 'EVD-2026-0891-01',
+        evidenceType: 'DIGITAL',
+        description: 'Cloned hard drive (1TB SSD) containing server log dumps and routing tables.',
+        location: 'Forensic Vault B-04',
+        collectedBy: 'Inspector Ramesh Sharma',
+      },
+    });
 
-  await prisma.timelineEvent.create({
-    data: {
-      caseId: case1.id,
-      title: 'Digital Forensic Storage Drive Seizure',
-      description: 'Seized server log drive deposited into Forensic Vault under seal.',
-      eventTime: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      createdBy: invUser.id,
-      evidenceId: ev1.id,
-    },
-  });
+    await prisma.timelineEvent.create({
+      data: {
+        caseId: case1.id,
+        title: 'Initial Registration & FIR Filing',
+        description: 'FIR 0891/2026 formally registered and assigned to Inspector Ramesh Sharma.',
+        eventTime: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        createdBy: invUser.id,
+        documentId: doc1.id,
+      },
+    });
 
-  // 7. Initial Audit Events
-  await prisma.auditEvent.create({
-    data: {
-      actorId: invUser.id,
-      action: 'document.upload',
-      resourceType: 'document',
-      resourceId: doc1.id,
-      outcome: 'SUCCESS',
-      metadata: JSON.stringify({ filename: 'FIR_0891_2026_Certified.pdf', sha256 }),
-    },
-  });
+    await prisma.timelineEvent.create({
+      data: {
+        caseId: case1.id,
+        title: 'Digital Forensic Storage Drive Seizure',
+        description: 'Seized server log drive deposited into Forensic Vault under seal.',
+        eventTime: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+        createdBy: invUser.id,
+        evidenceId: ev1.id,
+      },
+    });
 
-  await prisma.auditEvent.create({
-    data: {
-      actorId: invUser.id,
-      action: 'document.verify_integrity',
-      resourceType: 'document_version',
-      resourceId: ver1.id,
-      outcome: 'SUCCESS',
-      metadata: JSON.stringify({ isMatch: true, sha256 }),
-    },
-  });
+    // 7. Initial Audit Events
+    await prisma.auditEvent.create({
+      data: {
+        actorId: invUser.id,
+        action: 'document.upload',
+        resourceType: 'document',
+        resourceId: doc1.id,
+        outcome: 'SUCCESS',
+        metadata: JSON.stringify({ filename: 'FIR_0891_2026_Certified.pdf', sha256 }),
+      },
+    });
+
+    await prisma.auditEvent.create({
+      data: {
+        actorId: invUser.id,
+        action: 'document.verify_integrity',
+        resourceType: 'document_version',
+        resourceId: ver1.id,
+        outcome: 'SUCCESS',
+        metadata: JSON.stringify({ isMatch: true, sha256 }),
+      },
+    });
+  }
 
   console.log('Seeding complete! Demo users ready with password "DemoPass@123".');
 }

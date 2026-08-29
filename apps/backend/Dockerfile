@@ -14,6 +14,9 @@ COPY . .
 RUN npx prisma generate --schema=apps/backend/prisma/schema.prisma
 RUN npm run build --workspace=apps/backend
 
+COPY apps/backend/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
 EXPOSE 4000
 
-CMD ["node", "apps/backend/dist/main.js"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
