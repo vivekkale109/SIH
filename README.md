@@ -15,6 +15,7 @@ A centralized, role-based, tamper-evident digital document management platform d
 > - It does **not** use real FIRs, real personal data, or real official credentials.
 > - SHA-256 integrity verification confirms **byte-level content matching** only — it does not establish legal authenticity, authorship, or admissibility.
 > - AI output is strictly **advisory-only** and does not replace human investigator or legal judgment.
+> - **Production Security Requirement**: `JWT_SECRET`, `S3_ACCESS_KEY`, and `S3_SECRET_KEY` must be explicitly configured via environment variables in any non-local/production deployment. Ephemeral secrets and fallback credentials are used strictly for isolated local development, and the backend enforces explicit configuration at startup in production.
 
 ---
 

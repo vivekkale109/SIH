@@ -10,6 +10,7 @@ import { AppError, ForbiddenError, NotFoundError } from '../common/errors';
 export const documentsRouter = Router();
 
 const upload = multer({
+  storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max file size
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
