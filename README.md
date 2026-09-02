@@ -132,6 +132,45 @@ Click any persona on the login screen (`http://localhost:3000/login`) or sign in
 
 ---
 
+### Run Again After Stopping
+
+From the project directory, start the existing PostgreSQL and MinIO containers:
+
+```bash
+docker start sdms-postgres sdms-minio
+```
+
+Get the MinIO container's current internal IP address. Docker may assign a new
+address after a restart:
+
+```bash
+docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' sdms-minio
+```
+
+Replace `<MINIO_IP>` below with that value, then run each command in a separate
+terminal:
+
+```bash
+DATABASE_URL='postgresql://sdms:sdms_password@127.0.0.1:5432/sdms?schema=public' \
+S3_ENDPOINT='http://<MINIO_IP>:9000' \
+npm run dev:backend
+```
+
+```bash
+DATABASE_URL='postgresql://sdms:sdms_password@127.0.0.1:5432/sdms?schema=public' \
+S3_ENDPOINT='http://<MINIO_IP>:9000' \
+npm run dev:worker
+```
+
+```bash
+NEXT_PUBLIC_API_URL='http://localhost:4000/api/v1' \
+npm run dev:frontend
+```
+
+Open **`http://localhost:3000`** when all three services are ready.
+
+---
+
 ### Method B: Full Docker Compose Containerized Run
 
 To launch the complete containerized stack in a single command:
